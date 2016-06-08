@@ -22,6 +22,11 @@
                 func.etype = type;
                 options.evtlisteners.add(func);
                 return {
+                    on: function on() {
+                        func.etype = type;
+                        options.evtlisteners.add(func);
+                        return options;
+                    },
                     off: function off() {
                         return options.off(func);
                     }
