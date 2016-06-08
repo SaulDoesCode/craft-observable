@@ -1,9 +1,9 @@
 (function (root) {
 
     let isFunc = o => typeof o === 'function',
-    isString = o => typeof o === 'string',
-    isObj = o => toString.call(o) === '[object Object]',
-    defineprop = Object.defineProperty;
+        isString = o => typeof o === 'string',
+        isObj = o => toString.call(o) === '[object Object]',
+        defineprop = Object.defineProperty;
 
     function eventemitter(obj) {
         let options = {
@@ -48,11 +48,11 @@
             },
         };
         Object.keys(options).forEach(key => {
-          defineprop(obj, key, {
-              value: options[key],
-              enumerable: false,
-              writable: false,
-          })
+            defineprop(obj, key, {
+                value: options[key],
+                enumerable: false,
+                writable: false,
+            })
         });
         return obj;
     }
@@ -131,11 +131,13 @@
         });
         defineprop(obj, 'get', {
             value(key) {
-                let val;
-                obj.listeners.Get.forEach(ln => {
-                    if (ln.prop === '*' || ln.prop === key) val = ln.multi ? ln.fn('get', key, obj) : ln.fn(key, obj);
-                });
-                return val != undefined ? val : obj[key];
+                if (key != 'get' && key != 'set') {
+                    let val;
+                    obj.listeners.Get.forEach(ln => {
+                        if (ln.prop === '*' || ln.prop === key) val = ln.multi ? ln.fn('get', key, obj) : ln.fn(key, obj);
+                    });
+                    return val != undefined ? val : obj[key];
+                } else return obj[key];
             },
             enumerable: false,
         });
@@ -156,11 +158,13 @@
         obj = eventemitter(obj);
         if (root.Proxy) return new Proxy(obj, {
             get(target, key) {
-                let val;
-                target.listeners.Get.forEach(ln => {
-                    if (ln.prop === '*' || ln.prop === key) val = ln.multi ? ln.fn('get', key, target) : ln.fn(key, target);
-                });
-                return val != undefined ? val :  Reflect.get(target, key);
+                if (key != 'get' && key != 'set') {
+                    let val;
+                    target.listeners.Get.forEach(ln => {
+                        if (ln.prop === '*' || ln.prop === key) val = ln.multi ? ln.fn('get', key, target) : ln.fn(key, target);
+                    });
+                    return val != undefined ? val : Reflect.get(target, key);
+                } else return Reflect.get(target, key);
             },
             set(target, key, value) {
                 let val, onetime = false;
