@@ -1,4 +1,5 @@
 'use strict';
+
 (function (root) {
 
     var isFunc = function isFunc(o) {
@@ -147,11 +148,13 @@
         });
         defineprop(obj, 'get', {
             value: function value(key) {
-                var val = void 0;
-                obj.listeners.Get.forEach(function (ln) {
-                    if (ln.prop === '*' || ln.prop === key) val = ln.multi ? ln.fn('get', key, obj) : ln.fn(key, obj);
-                });
-                return val != undefined ? val : obj[key];
+                if (key != 'get' && key != 'set') {
+                    var val = void 0;
+                    obj.listeners.Get.forEach(function (ln) {
+                        if (ln.prop === '*' || ln.prop === key) val = ln.multi ? ln.fn('get', key, obj) : ln.fn(key, obj);
+                    });
+                    return val != undefined ? val : obj[key];
+                } else return obj[key];
             },
 
             enumerable: false
@@ -173,11 +176,13 @@
         obj = eventemitter(obj);
         if (root.Proxy) return new Proxy(obj, {
             get: function get(target, key) {
-                var val = void 0;
-                target.listeners.Get.forEach(function (ln) {
-                    if (ln.prop === '*' || ln.prop === key) val = ln.multi ? ln.fn('get', key, target) : ln.fn(key, target);
-                });
-                return val != undefined ? val : Reflect.get(target, key);
+                if (key != 'get' && key != 'set') {
+                    var val = void 0;
+                    target.listeners.Get.forEach(function (ln) {
+                        if (ln.prop === '*' || ln.prop === key) val = ln.multi ? ln.fn('get', key, target) : ln.fn(key, target);
+                    });
+                    return val != undefined ? val : Reflect.get(target, key);
+                } else return Reflect.get(target, key);
             },
             set: function set(target, key, value) {
                 var val = void 0,
