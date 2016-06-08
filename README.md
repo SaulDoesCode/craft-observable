@@ -7,6 +7,7 @@ small proxy driven observable objects to fit any framework or library
 * Array.from
 
 ### craft-observable code demo
+basic instanciator `` observable(=[obj])``
 
 ```javascript
   let farm = observable();
@@ -39,3 +40,49 @@ small proxy driven observable objects to fit any framework or library
   
   console.log(farm.animals.sheep); // -> the farm has 2 cows
 ```
+#### event system 
+the observables also include a build in event system to help make them as useful as possible
+```javascript
+  let notifier = observable();
+  
+  notifier.on('ui-change',(html,...otherargs) => {
+    let article = document.createElement('article');
+    article.innerHTML = html;
+    document.querySelector('div.articles').appendChild(article);
+  });
+  
+  // some seriously async code
+  fetch('/doodle.html')
+  .then(checkerrors)
+  .then(response => response.text())
+  .then(text => {
+    notifier.emit('ui-change',text);
+  });
+  
+  // to access methods on the listener assign it as a variable
+  let uiChange = notifier.on('ui-change',(html,...otherargs) => {
+    let article = document.createElement('article');
+    article.innerHTML = html;
+    document.querySelector('div.articles').appendChild(article);
+  });
+  // lets say you want to stop recieving ui-change events
+  uiChange.off();
+  // but now you want to enable them again
+  uiChange.on();
+```
+
+### observables have the following properties
+* .isObservable - true if it is an observable
+* .set, .get - old school non proxy accessors
+* .$set, .$get, .$change - listeners for access events
+* .on , .once , .off , .emit, .stopall - event system
+* .listeners - all the accessor listeners
+* .evtlisteners - event listeners
+* .defineHandle - define event methods instead of using .on('xyz',function) all the time
+
+### Notes
+This little doodle is subject to change but we'll try and keep it working as much as posible
+with no breaking changes. if you are experiencing issues or want to improve a feature do fork, 
+raise issues tell us about bugs and so forth.
+
+Thank you very much enjoy the observables
