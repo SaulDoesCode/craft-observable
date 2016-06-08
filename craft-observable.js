@@ -135,7 +135,7 @@
                 obj.listeners.Get.forEach(ln => {
                     if (ln.prop === '*' || ln.prop === key) val = ln.multi ? ln.fn('get', key, obj) : ln.fn(key, obj);
                 });
-                return obj[key];
+                return val != undefined ? val : obj[key];
             },
             enumerable: false,
         });
@@ -147,7 +147,7 @@
                         ln.fn(key, value, obj, Object.hasOwnProperty(obj, key));
                 });
                 val = val != undef ? val : value;
-                if (isObj(val)) observable(val);
+                if (isObj(val) && !val.isObservable) val = observable(val);
                 target.emit('$uberset:' + key, val);
                 obj[key] = val;
             },
@@ -158,11 +158,9 @@
             get(target, key) {
                 let val;
                 target.listeners.Get.forEach(ln => {
-                    if (ln.prop === '*' || ln.prop === key) {
-                        val = ln.multi ? ln.fn('get', key, target) : ln.fn(key, target);
-                    }
+                    if (ln.prop === '*' || ln.prop === key) val = ln.multi ? ln.fn('get', key, target) : ln.fn(key, target);
                 });
-                return val != undefined ? val : Reflect.get(target, key);
+                return val != undefined ? val :  Reflect.get(target, key);
             },
             set(target, key, value) {
                 let val, onetime = false;
@@ -177,7 +175,7 @@
                     }
                 });
                 val = val != undefined ? val : value;
-                if (isObj(val)) observable(val);
+                if (isObj(val) && !val.isObservable) val = observable(val);
                 target.emit('$uberset:' + key, val);
                 return Reflect.set(target, key, val);
             }
