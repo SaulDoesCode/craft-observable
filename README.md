@@ -38,7 +38,7 @@ basic instanciator `` observable(=[obj])``
   // if proxy is not available in your browser use the traditional get and set accessor methods
   console.log(farm.animals.get('sheep')); // -> the farm has no sheep
   
-  console.log(farm.animals.sheep); // -> the farm has 2 cows
+  console.log(farm.animals.cows); // -> the farm has 2 cows
 ```
 #### event system 
 the observables also include a build in event system to help make them as useful as possible
