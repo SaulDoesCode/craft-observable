@@ -1,7 +1,5 @@
-'use strict';
-
 (function (root) {
-
+'use strict';
     var isFunc = function isFunc(o) {
         return typeof o === 'function';
     },
@@ -212,6 +210,13 @@
         }
     }
 
-    root.observable = observable;
-    root.eventemitter = eventemitter;
+    if (typeof exports !== 'undefined') {
+        module.exports = {
+            observable: observable,
+            eventemitter: eventemitter
+        };
+    } else {
+        root.observable = observable;
+        root.eventemitter = eventemitter;
+    }
 })(this);
