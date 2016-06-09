@@ -1,13 +1,13 @@
-# craft-observable
+## craft-observable
 small proxy driven observable objects to fit any framework or library
 
-### craft-observable uses
+#### craft-observable uses
 * Proxy (optional)
 * Sets
 * Array.from
 
-### craft-observable code demo
-basic instanciator `` observable(=[obj])``
+#### observables code demo
+basic instanciator `` observable(=[obj|function])``
 
 ```javascript
   let farm = observable();
@@ -69,6 +69,31 @@ the observables also include a build in event system to help make them as useful
   uiChange.off();
   // but now you want to enable them again
   uiChange.on();
+```
+#### separate use of event system
+
+```javascript
+  let messager = eventemitter({});
+  
+  // .on, .once listeners have same interface
+  messager.on('msg', event => {
+    console.log('new message',event);
+  });
+  
+  // .emit takes a string event identifier
+  // any arguments that follow will be sent to listeners 
+  // there are no type biases any argument will do
+  messager.emit('msg',{
+    body : 'new piece of information'
+  });
+  
+  messager.emit('msg','new piece of info','code 3' /*...*/);
+  // this halts any events being emited 
+  // .stopall([true|false])
+  messager.stopall(); // stopped
+  // the bool is optional to turn event emitting on again
+  // just call .stopall again with false
+  messager.stopall(false); // working again
 ```
 
 ### observables have the following properties
