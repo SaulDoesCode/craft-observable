@@ -14,10 +14,10 @@
                 func.etype = type;
                 options.evtlisteners.add(func);
                 return {
-                    on : () => {
-                      func.etype = type;
-                      options.evtlisteners.add(func);
-                      return options;
+                    on: () => {
+                        func.etype = type;
+                        options.evtlisteners.add(func);
+                        return options;
                     },
                     off: () => options.off(func),
                 }
@@ -195,6 +195,13 @@
         }
     }
 
-    root.observable = observable;
-    root.eventemitter = eventemitter;
+    if (typeof exports !== 'undefined') {
+      module.exports = {
+        observable,
+        eventemitter,
+      }
+    } else {
+        root.observable = observable;
+        root.eventemitter = eventemitter;
+    }
 })(this)
