@@ -214,4 +214,4 @@
 
     root.observable = observable;
     root.eventemitter = eventemitter;
-})(self);
+})(this);
