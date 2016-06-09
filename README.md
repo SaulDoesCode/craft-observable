@@ -10,6 +10,9 @@ small proxy driven observable objects to fit any framework or library
 basic instanciator `` observable(=[obj|function])``
 
 ```javascript
+  // node.js style requiring works but will be global if not available
+  const { observable, eventemitter } = require('./craft-observable.js');
+  
   let farm = observable();
   
   // listen for set events
