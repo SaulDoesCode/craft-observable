@@ -43,7 +43,7 @@
                 return options;
             },
             stopall(stop) {
-                options.stop = stop;
+                options.stop = stop === true || stop === false ? stop : true;
             },
             defineHandle(name, type) {
                 if (!type) type = name;
