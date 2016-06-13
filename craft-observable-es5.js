@@ -1,5 +1,5 @@
 (function (root) {
-'use strict';
+    'use strict';
     var isFunc = function isFunc(o) {
             return typeof o === 'function';
         },
@@ -25,6 +25,7 @@
                         options.evtlisteners.add(func);
                         return options;
                     },
+
                     off: function off() {
                         return options.off(func);
                     }
@@ -55,7 +56,6 @@
                 return options;
             },
             stopall: function stopall(stop) {
-                if (!is.Bool(stop)) stop = true;
                 options.stop = stop;
             },
             defineHandle: function defineHandle(name, type) {
@@ -178,7 +178,7 @@
         });
         obj = eventemitter(obj);
         Object.keys(obj).forEach(function (key) {
-            if (is.Object(obj[key]) && !obj[key].isObservable) obj[key] = observable(obj[key]);
+            if (isObj(obj[key]) && !obj[key].isObservable) obj[key] = observable(obj[key]);
         });
         if (root.Proxy) return new Proxy(obj, {
             get: function get(target, key) {

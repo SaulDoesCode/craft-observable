@@ -43,7 +43,6 @@
                 return options;
             },
             stopall(stop) {
-                if (!is.Bool(stop)) stop = true;
                 options.stop = stop;
             },
             defineHandle(name, type) {
@@ -61,7 +60,6 @@
         });
         return obj;
     }
-
 
     function observable(obj) {
         if (obj == undefined) obj = {};
@@ -162,7 +160,7 @@
         });
         obj = eventemitter(obj);
         Object.keys(obj).forEach(key => {
-          if(is.Object(obj[key]) && !obj[key].isObservable) obj[key] = observable(obj[key]);
+          if(isObj(obj[key]) && !obj[key].isObservable) obj[key] = observable(obj[key]);
         });
         if (root.Proxy) return new Proxy(obj, {
             get(target, key) {
