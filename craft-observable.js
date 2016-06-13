@@ -14,7 +14,7 @@
                 func.etype = type;
                 options.evtlisteners.add(func);
                 return {
-                    on: () => {
+                    on() {
                         func.etype = type;
                         options.evtlisteners.add(func);
                         return options;
@@ -161,6 +161,9 @@
             enumerable: false,
         });
         obj = eventemitter(obj);
+        Object.keys(obj).forEach(key => {
+          if(is.Object(obj[key]) && !obj[key].isObservable) obj[key] = observable(obj[key]);
+        });
         if (root.Proxy) return new Proxy(obj, {
             get(target, key) {
                 if (key != 'get' && key != 'set') {
