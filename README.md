@@ -3,7 +3,8 @@ small proxy driven observable objects to fit any framework or library
 
 #### craft-observable uses
 * Proxy (optional)
-* Sets
+* ES6 syntax (optional)
+* Set
 * Array.from
 
 #### observables code demo
@@ -35,7 +36,9 @@ basic instanciator ``observable(=[obj|function])``
     cows: 2
   };
 
-  farm.animals.$get((key, obj) => `the farm has ${obj[key] == undefined ? 'no ' + key : obj[key] + ' ' + key}`);
+  farm.animals.$get((key, obj) => {
+      return `the farm has ${obj[key] == undefined ? 'no ' + key : obj[key] + ' ' + key}`;
+  });
 
   console.log(farm.animals.sheep); // -> the farm has no sheep
   // if proxy is not available in your browser use the traditional get and set accessor methods
