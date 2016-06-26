@@ -1,14 +1,17 @@
+'use strict';
+
 (function (root) {
-    'use strict';
+    "use strict";
+
     var isFunc = function isFunc(o) {
-            return typeof o === 'function';
-        },
+        return typeof o === 'function';
+    },
         isString = function isString(o) {
-            return typeof o === 'string';
-        },
+        return typeof o === 'string';
+    },
         isObj = function isObj(o) {
-            return toString.call(o) === '[object Object]';
-        },
+        return toString.call(o) === '[object Object]';
+    },
         defineprop = Object.defineProperty;
 
     function eventemitter(obj) {
@@ -149,6 +152,7 @@
             enumerable: false,
             writable: false
         });
+        obj = eventemitter(obj);
         defineprop(obj, 'get', {
             value: function value(key) {
                 if (key != 'get' && key != 'set') {
@@ -170,13 +174,12 @@
                 });
                 val = val != undef ? val : _value;
                 if (isObj(val) && !val.isObservable) val = observable(val);
-                target.emit('$uberset:' + key, val);
+                obj.emit('$uberset:' + key, val);
                 obj[key] = val;
             },
 
             enumerable: false
         });
-        obj = eventemitter(obj);
         Object.keys(obj).forEach(function (key) {
             if (isObj(obj[key]) && !obj[key].isObservable) obj[key] = observable(obj[key]);
         });
@@ -207,8 +210,7 @@
                 target.emit('$uberset:' + key, val);
                 return Reflect.set(target, key, val);
             }
-        });
-        else {
+        });else {
             console.warn('This Browser does not support Proxy, observables need to use the .set and .get accessors to work');
             return obj;
         }
