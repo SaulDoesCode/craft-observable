@@ -1,5 +1,5 @@
 (function (root) {
-
+"use strict";
     let isFunc = o => typeof o === 'function',
         isString = o => typeof o === 'string',
         isObj = o => toString.call(o) === '[object Object]',
@@ -132,6 +132,7 @@
             enumerable: false,
             writable: false,
         });
+        obj = eventemitter(obj);
         defineprop(obj, 'get', {
             value(key) {
                 if (key != 'get' && key != 'set') {
@@ -153,12 +154,11 @@
                 });
                 val = val != undef ? val : value;
                 if (isObj(val) && !val.isObservable) val = observable(val);
-                target.emit('$uberset:' + key, val);
+                obj.emit('$uberset:' + key, val);
                 obj[key] = val;
             },
             enumerable: false,
         });
-        obj = eventemitter(obj);
         Object.keys(obj).forEach(key => {
           if(isObj(obj[key]) && !obj[key].isObservable) obj[key] = observable(obj[key]);
         });
