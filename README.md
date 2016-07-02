@@ -76,6 +76,8 @@ the observables also include a build in event system to help make them as useful
   uiChange.off();
   // but now you want to enable them again
   uiChange.on();
+  // or
+  uiChange.once();
 ```
 #### separate use of event system
 
