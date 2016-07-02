@@ -6,6 +6,7 @@ small proxy driven observable objects to fit any framework or library
 * ES6 syntax (optional)
 * Set
 * Array.from
+* Object.assign
 
 #### observables code demo
 basic instanciator ``observable(=[obj|function])``

@@ -9,6 +9,9 @@
         isString = function isString(o) {
         return typeof o === 'string';
     },
+        isBool = function isBool(o) {
+        return typeof o === 'boolean';
+    },
         isObj = function isObj(o) {
         return toString.call(o) === '[object Object]';
     },
@@ -19,27 +22,31 @@
             evtlisteners: new Set(),
             stop: false,
             on: function on(type, func) {
-                if (!isFunc(func)) throw new TypeError('.on(' + type + ',func) : func is not a function');
+                if (!isFunc(func)) throw new TypeError('.on() needs a function');
                 func.etype = type;
                 options.evtlisteners.add(func);
-                return {
+                func.ehandle = {
                     on: function on() {
                         func.etype = type;
                         options.evtlisteners.add(func);
-                        return options;
+                        return func.ehandle;
                     },
-
+                    once: function once() {
+                        return options.off(func).once(type, func);
+                    },
                     off: function off() {
-                        return options.off(func);
+                        options.off(func);
+                        return func.ehandle;
                     }
                 };
+                return func.ehandle;
             },
             once: function once(type, func) {
                 function funcwrapper() {
                     func.apply(obj, arguments);
                     options.off(funcwrapper);
                 }
-                options.on(type, funcwrapper);
+                return options.on(type, funcwrapper);
             },
             off: function off(func) {
                 if (options.evtlisteners.has(func)) options.evtlisteners.delete(func);
@@ -48,9 +55,9 @@
             emit: function emit(type) {
                 var _arguments = arguments;
 
-                if (!options.stop) {
+                if (!options.stop && options.evtlisteners.size > 0) {
                     (function () {
-                        var args = Array.from(_arguments).slice(1);
+                        var args = [].slice.call(_arguments, 1);
                         options.evtlisteners.forEach(function (ln) {
                             if (ln.etype == type && !options.stop) ln.apply(obj, args);
                         });
@@ -59,7 +66,7 @@
                 return options;
             },
             stopall: function stopall(stop) {
-                options.stop = stop === true || stop === false ? stop : true;
+                options.stop = isBool(bool) ? stop : true;
             },
             defineHandle: function defineHandle(name, type) {
                 if (!type) type = name;
@@ -69,14 +76,7 @@
                 return options;
             }
         };
-        Object.keys(options).forEach(function (key) {
-            defineprop(obj, key, {
-                value: options[key],
-                enumerable: false,
-                writable: false
-            });
-        });
-        return obj;
+        return Object.assign(obj, options);
     }
 
     function observable(obj) {
