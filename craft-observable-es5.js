@@ -1,202 +1,193 @@
-'use strict';
-
 (function (root) {
     "use strict";
-
-    var isFunc = function isFunc(o) {
-        return typeof o === 'function';
-    },
-        isString = function isString(o) {
-        return typeof o === 'string';
-    },
-        isBool = function isBool(o) {
-        return typeof o === 'boolean';
-    },
-        isObj = function isObj(o) {
-        return toString.call(o) === '[object Object]';
-    },
-        defineprop = Object.defineProperty;
-
-    function eventemitter(obj) {
-        var options = {
-            evtlisteners: new Set(),
-            stop: false,
-            on: function on(type, func) {
-                if (!isFunc(func)) throw new TypeError('.on() needs a function');
-                func.etype = type;
-                options.evtlisteners.add(func);
-                func.ehandle = {
-                    on: function on() {
-                        func.etype = type;
-                        options.evtlisteners.add(func);
-                        return func.ehandle;
-                    },
-                    once: function once() {
-                        return options.off(func).once(type, func);
-                    },
-                    off: function off() {
-                        options.off(func);
-                        return func.ehandle;
-                    }
-                };
-                return func.ehandle;
-            },
-            once: function once(type, func) {
-                function funcwrapper() {
-                    func.apply(obj, arguments);
-                    options.off(funcwrapper);
-                }
-                return options.on(type, funcwrapper);
-            },
-            off: function off(func) {
-                if (options.evtlisteners.has(func)) options.evtlisteners.delete(func);
-                return options;
-            },
-            emit: function emit(type) {
-                var _arguments = arguments;
-
-                if (!options.stop && options.evtlisteners.size > 0) {
-                    (function () {
-                        var args = [].slice.call(_arguments, 1);
-                        options.evtlisteners.forEach(function (ln) {
-                            if (ln.etype == type && !options.stop) ln.apply(obj, args);
-                        });
-                    })();
-                }
-                return options;
-            },
-            stopall: function stopall(stop) {
-                options.stop = isBool(bool) ? stop : true;
-            },
-            defineHandle: function defineHandle(name, type) {
-                if (!type) type = name;
-                this[name] = function (fn, once) {
-                    return options[once == true ? 'once' : 'on'](type, fn);
-                };
-                return options;
-            }
+    var isFunc = function (o) {
+            return typeof o === 'function';
+        },
+        isString = function (o) {
+            return typeof o === 'string';
+        },
+        isBool = function (o) {
+            return typeof o === 'boolean';
+        },
+        isObj = function (o) {
+            return toString.call(o) === '[object Object]';
+        },
+        undef = undefined,
+        defineprop = Object.defineProperty,
+        desc = function (value, write, enumerable) {
+            return {
+                value: value,
+                write: isBool(write) ? write : false,
+                enumerable: isBool(enumerable) ? enumerable : false
+            };
         };
-        return Object.assign(obj, options);
+
+    function eventsys(obj) {
+        if (!obj) obj = {};
+        var listeners = new Set(),
+            stop = false;
+
+        function on(type, func) {
+            if (!isFunc(func)) throw new TypeError('.on() needs a function');
+            func.type = type;
+            listeners.add(func);
+            func.handle = {
+                on: function () {
+                    listeners.add(func);
+                    return func.handle;
+                },
+                once: function () {
+                    return once(type, func);
+                },
+                off: function () {
+                    off(func);
+                    return func.handle;
+                }
+            };
+            return func.handle;
+        }
+
+        function once(type, func) {
+            off(func);
+
+            function funcwrapper() {
+                func.apply(obj, arguments);
+                off(funcwrapper);
+            }
+            return on(type, funcwrapper);
+        }
+
+        function off(func) {
+            if (listeners.has(func)) listeners.delete(func);
+        }
+
+        function emit(type) {
+            var _arguments = arguments,
+                _this = this;
+            if (!stop && listeners.size > 0) {
+                (function () {
+                    var args = [].slice.call(_arguments, 1),
+                        ctx = _this;
+                    listeners.forEach(function (ln) {
+                        if (ln.type == type && !stop) ln.apply(ctx, args);
+                    });
+                })();
+            }
+        }
+
+        function stopall(state) {
+            stop = isBool(state) ? state : true;
+        }
+
+        function defineHandle(name, type) {
+            if (!type) type = name;
+            this[name] = function (fn, useOnce) {
+                return (useOnce == true ? once : on)(type, fn);
+            };
+        }
+        obj.on = on;
+        obj.once = once;
+        obj.off = on;
+        obj.emit = emit;
+        obj.defineHandle = defineHandle;
+        obj.stopall = stopall;
+        return obj;
     }
 
     function observable(obj) {
-        if (obj == undefined) obj = {};
-        defineprop(obj, 'listeners', {
-            value: {
-                Get: new Set(),
-                Set: new Set()
-            },
-            enumerable: false,
-            writable: false
-        });
-        defineprop(obj, 'isObservable', {
-            value: true,
-            enumerable: false,
-            writable: false
-        });
-        ['$get', '$set'].forEach(function (t) {
-            var Type = 'Set';
-            if (t == '$get') Type = 'Get';
-            defineprop(obj, t, {
-                value: function value(prop, func) {
-                    if (isFunc(prop)) {
-                        func = prop;
-                        prop = '*';
-                    }
-                    if (!isFunc(func)) throw new Error('no function');
-                    var listener = {
+        if (!obj) obj = {};
+        obj = eventsys(obj);
+        var listeners = {
+            Get: new Set(),
+            Set: new Set()
+        };
+        defineprop(obj, 'isObservable', desc(true));
+        ['$get', '$set'].forEach(function (prop) {
+            var accessor = prop == '$get' ? 'Get' : 'Set';
+            defineprop(obj, prop, desc(function (prop, func) {
+                if (isFunc(prop)) {
+                    func = prop;
+                    prop = '*';
+                }
+                if (!isFunc(func)) throw new Error('.' + prop + ' no function');
+                var listener = {
                         prop: isString(prop) ? prop : '*',
                         fn: func
-                    };
-                    var options = {
-                        get on() {
-                            obj.listeners[Type].add(listener);
+                    },
+                    options = {
+                        on: function () {
+                            listeners[accessor].add(listener);
                             return options;
                         },
-                        get off() {
-                            obj.listeners[Type].delete(listener);
+                        off: function () {
+                            listeners[accessor].delete(listener);
                             return options;
                         }
                     };
-                    return options.on;
-                },
-
-                enumerable: false,
-                writable: false
-            });
+                return options.on();
+            }));
         });
-
-        defineprop(obj, '$change', {
-            value: function value(prop, func) {
-                if (!isFunc(func)) throw new Error('no function');
-                var listener = {
+        defineprop(obj, '$change', desc(function (prop, func) {
+            if (isFunc(prop)) {
+                func = prop;
+                prop = '*';
+            }
+            if (!isFunc(func)) throw new Error('.$change : no function');
+            var listener = {
                     prop: isString(prop) ? prop : '*',
                     fn: func,
                     multi: true
-                };
-                var options = {
-                    get on() {
-                        obj.listeners.Get.add(listener);
-                        obj.listeners.Set.add(listener);
+                },
+                options = {
+                    on: function () {
+                        listeners.Get.add(listener);
+                        listeners.Set.add(listener);
                         return options;
                     },
-                    get off() {
-                        obj.listeners.Get.delete(listener);
-                        obj.listeners.Set.delete(listener);
+                    off: function () {
+                        listeners.Get.delete(listener);
+                        listeners.Set.delete(listener);
                         return options;
                     }
                 };
-                return options.on;
-            },
-
-            enumerable: false,
-            writable: false
-        });
-        obj = eventemitter(obj);
-        defineprop(obj, 'get', {
-            value: function value(key) {
-                if (key != 'get' && key != 'set') {
-                    var val = void 0;
-                    obj.listeners.Get.forEach(function (ln) {
-                        if (ln.prop === '*' || ln.prop === key) val = ln.multi ? ln.fn('get', key, obj) : ln.fn(key, obj);
-                    });
-                    return val != undefined ? val : obj[key];
-                } else return obj[key];
-            },
-
-            enumerable: false
-        });
-        defineprop(obj, 'set', {
-            value: function value(key, _value) {
+            return options.on;
+        }));
+        defineprop(obj, 'get', desc(function (key) {
+            if (key != 'get' && key != 'set') {
                 var val = void 0;
-                obj.listeners.Set.forEach(function (ln) {
-                    if (ln.prop === '*' || ln.prop === key) val = ln.multi ? ln.fn('set', key, _value, obj, Object.hasOwnProperty(obj, key)) : ln.fn(key, _value, obj, Object.hasOwnProperty(obj, key));
+                listeners.Get.forEach(function (ln) {
+                    if (ln.prop === '*' || ln.prop === key) val = ln.multi ? ln.fn('get', key, obj) : ln.fn(key, obj);
                 });
-                val = val != undef ? val : _value;
-                if (isObj(val) && !val.isObservable) val = observable(val);
-                obj.emit('$uberset:' + key, val);
-                obj[key] = val;
-            },
-
-            enumerable: false
-        });
-        Object.keys(obj).forEach(function (key) {
+                return val != undef ? val : obj[key];
+            } else return obj[key];
+        }));
+        defineprop(obj, 'set', desc(function (key, value) {
+            var val = void 0;
+            listeners.Set.forEach(function (ln) {
+                if (ln.prop === '*' || ln.prop === key) val = ln.multi ? ln.fn('set', key, value, obj, Object.hasOwnProperty(obj, key)) : ln.fn(key, value, obj, Object.hasOwnProperty(obj, key));
+            });
+            val = val != undef ? val : value;
+            if (isObj(val) && !val.isObservable) val = observable(val);
+            obj.emit('$uberset:' + key, val);
+            obj[key] = val;
+        }));
+        for (var key in obj) {
             if (isObj(obj[key]) && !obj[key].isObservable) obj[key] = observable(obj[key]);
-        });
-        if (root.Proxy) return new Proxy(obj, {
-            get: function get(target, key) {
+        }
+        if (typeof Proxy != "undefined") return new Proxy(obj, {
+            get: function (target, key) {
                 if (key != 'get' && key != 'set') {
                     var val = void 0;
-                    target.listeners.Get.forEach(function (ln) {
+                    listeners.Get.forEach(function (ln) {
                         if (ln.prop === '*' || ln.prop === key) val = ln.multi ? ln.fn('get', key, target) : ln.fn(key, target);
                     });
-                    return val != undefined ? val : Reflect.get(target, key);
+                    return val != undef ? val : Reflect.get(target, key);
                 } else return Reflect.get(target, key);
             },
-            set: function set(target, key, value) {
+            set: function (target, key, value) {
                 var val = void 0,
                     onetime = false;
-                target.listeners.Set.forEach(function (ln) {
+                listeners.Set.forEach(function (ln) {
                     if (ln.prop === '*' || ln.prop === key) {
                         if (onetime) {
                             value = val;
@@ -205,24 +196,22 @@
                         val = ln.multi ? ln.fn('set', key, value, target, !Reflect.has(target, key)) : ln.fn(key, value, target, !Reflect.has(target, key));
                     }
                 });
-                val = val != undefined ? val : value;
+                val = val != undef ? val : value;
                 if (isObj(val) && !val.isObservable) val = observable(val);
                 target.emit('$uberset:' + key, val);
                 return Reflect.set(target, key, val);
             }
-        });else {
-            console.warn('This Browser does not support Proxy, observables need to use the .set and .get accessors to work');
-            return obj;
-        }
+        });
+        console.warn('This Browser does not support Proxy, observables need to use the .set and .get accessors to work');
+        return obj;
     }
-
     if (typeof exports !== 'undefined') {
         module.exports = {
             observable: observable,
-            eventemitter: eventemitter
+            eventsys: eventsys
         };
     } else {
         root.observable = observable;
-        root.eventemitter = eventemitter;
+        root.eventsys = eventsys;
     }
 })(this);

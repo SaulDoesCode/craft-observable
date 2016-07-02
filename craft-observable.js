@@ -1,181 +1,179 @@
 (function (root) {
-"use strict";
-    let isFunc = o => typeof o === 'function',
+    "use strict";
+    const isFunc = o => typeof o === 'function',
         isString = o => typeof o === 'string',
         isBool = o => typeof o === 'boolean',
         isObj = o => toString.call(o) === '[object Object]',
-        defineprop = Object.defineProperty;
+        undef = undefined,
+        defineprop = Object.defineProperty,
+        desc = (value, write, enumerable) => ({
+            value,
+            write: isBool(write) ? write : false,
+            enumerable: isBool(enumerable) ? enumerable : false,
+        })
 
-    function eventemitter(obj) {
-        let options = {
-            evtlisteners: new Set,
-            stop: false,
-            on(type, func) {
-                if (!isFunc(func)) throw new TypeError('.on() needs a function');
-                func.etype = type;
-                options.evtlisteners.add(func);
-                func.ehandle = {
-                    on() {
-                        func.etype = type;
-                        options.evtlisteners.add(func);
-                        return func.ehandle;
-                    },
-                    once() {
-                      return options.off(func).once(type,func);
-                    },
-                    off() {
-                      options.off(func);
-                      return func.ehandle;
-                    }
-                };
-                return func.ehandle
-            },
-            once(type, func) {
-                function funcwrapper() {
-                    func.apply(obj, arguments);
-                    options.off(funcwrapper);
+    function eventsys(obj) {
+        if (!obj) obj = {};
+        let listeners = new Set,
+            stop = false;
+
+        function on(type, func) {
+            if (!isFunc(func)) throw new TypeError('.on() needs a function');
+            func.type = type;
+            listeners.add(func);
+            func.handle = {
+                on() {
+                    listeners.add(func);
+                    return func.handle;
+                },
+                once: () => once(type, func),
+                off() {
+                    off(func);
+                    return func.handle;
                 }
-                return options.on(type, funcwrapper);
-            },
-            off(func) {
-                if (options.evtlisteners.has(func)) options.evtlisteners.delete(func);
-                return options;
-            },
-            emit(type) {
-                if (!options.stop && options.evtlisteners.size > 0) {
-                    let args = [].slice.call(arguments,1);
-                    options.evtlisteners.forEach(ln => {
-                        if (ln.etype == type && !options.stop) ln.apply(obj, args);
-                    });
-                }
-                return options;
-            },
-            stopall(stop) {
-                options.stop = isBool(bool) ? stop : true;
-            },
-            defineHandle(name, type) {
-                if (!type) type = name;
-                this[name] = (fn, once) => options[once == true ? 'once' : 'on'](type, fn);
-                return options;
-            },
-        };
-        return Object.assign(obj,options);
+            };
+            return func.handle;
+        }
+
+        function once(type, func) {
+            off(func);
+
+            function funcwrapper() {
+                func.apply(obj, arguments);
+                off(funcwrapper);
+            }
+            return on(type, funcwrapper);
+        }
+
+        function off(func) {
+            if (listeners.has(func)) listeners.delete(func);
+        }
+
+        function emit(type) {
+            if (!stop && listeners.size > 0) {
+                let args = [].slice.call(arguments, 1),
+                    ctx = this;
+                listeners.forEach(ln => {
+                    if (ln.type == type && !stop) ln.apply(ctx, args);
+                });
+            }
+        }
+
+        function stopall(state) {
+            stop = isBool(state) ? state : true;
+        }
+
+        function defineHandle(name, type) {
+            if (!type) type = name;
+            this[name] = (fn, useOnce) => (useOnce == true ? once : on)(type, fn);
+        }
+
+        obj.on = on;
+        obj.once = once;
+        obj.off = on;
+        obj.emit = emit;
+        obj.defineHandle = defineHandle;
+        obj.stopall = stopall;
+
+        return obj;
     }
 
     function observable(obj) {
-        if (obj == undefined) obj = {};
-        defineprop(obj, 'listeners', {
-            value: {
-                Get: new Set,
-                Set: new Set,
-            },
-            enumerable: false,
-            writable: false,
-        });
-        defineprop(obj, 'isObservable', {
-            value: true,
-            enumerable: false,
-            writable: false,
-        });
-        ['$get', '$set'].forEach(t => {
-            let Type = 'Set';
-            if (t == '$get') Type = 'Get';
-            defineprop(obj, t, {
-                value(prop, func) {
-                    if (isFunc(prop)) {
-                        func = prop;
-                        prop = '*';
-                    }
-                    if (!isFunc(func)) throw new Error('no function');
-                    let listener = {
-                        prop: isString(prop) ? prop : '*',
-                        fn: func,
-                    }
-                    let options = {
-                        get on() {
-                            obj.listeners[Type].add(listener);
-                            return options
-                        },
-                        get off() {
-                            obj.listeners[Type].delete(listener);
-                            return options
-                        },
-                    };
-                    return options.on;
-                },
-                enumerable: false,
-                writable: false,
-            });
-        });
+        if (!obj) obj = {};
+        obj = eventsys(obj);
 
-        defineprop(obj, '$change', {
-            value(prop, func) {
-                if (!isFunc(func)) throw new Error('no function');
+        let listeners = {
+            Get: new Set,
+            Set: new Set,
+        };
+        defineprop(obj, 'isObservable', desc(true));
+        ['$get', '$set'].forEach(prop => {
+            let accessor = prop == '$get' ? 'Get' : 'Set';
+            defineprop(obj, prop, desc((prop, func) => {
+                if (isFunc(prop)) {
+                    func = prop;
+                    prop = '*';
+                }
+                if (!isFunc(func)) throw new Error('.'+prop+' no function');
                 let listener = {
                     prop: isString(prop) ? prop : '*',
                     fn: func,
-                    multi: true,
                 }
                 let options = {
-                    get on() {
-                        obj.listeners.Get.add(listener);
-                        obj.listeners.Set.add(listener);
+                    on() {
+                        listeners[accessor].add(listener);
                         return options
                     },
-                    get off() {
-                        obj.listeners.Get.delete(listener);
-                        obj.listeners.Set.delete(listener);
+                    off() {
+                        listeners[accessor].delete(listener);
                         return options
                     },
                 };
-                return options.on;
-            },
-            enumerable: false,
-            writable: false,
+                return options.on();
+            }));
         });
-        obj = eventemitter(obj);
-        defineprop(obj, 'get', {
-            value(key) {
-                if (key != 'get' && key != 'set') {
-                    let val;
-                    obj.listeners.Get.forEach(ln => {
-                        if (ln.prop === '*' || ln.prop === key) val = ln.multi ? ln.fn('get', key, obj) : ln.fn(key, obj);
-                    });
-                    return val != undefined ? val : obj[key];
-                } else return obj[key];
-            },
-            enumerable: false,
-        });
-        defineprop(obj, 'set', {
-            value(key, value) {
+
+        defineprop(obj, '$change', desc((prop, func) => {
+            if (isFunc(prop)) {
+                func = prop;
+                prop = '*';
+            }
+            if (!isFunc(func)) throw new Error('.$change : no function');
+            let listener = {
+                prop: isString(prop) ? prop : '*',
+                fn: func,
+                multi: true,
+            }
+            let options = {
+                on() {
+                    listeners.Get.add(listener);
+                    listeners.Set.add(listener);
+                    return options
+                },
+                off() {
+                    listeners.Get.delete(listener);
+                    listeners.Set.delete(listener);
+                    return options
+                },
+            };
+            return options.on;
+        }));
+        defineprop(obj, 'get', desc(key => {
+            if (key != 'get' && key != 'set') {
                 let val;
-                obj.listeners.Set.forEach(ln => {
-                    if (ln.prop === '*' || ln.prop === key) val = ln.multi ? ln.fn('set', key, value, obj, Object.hasOwnProperty(obj, key)) :
-                        ln.fn(key, value, obj, Object.hasOwnProperty(obj, key));
+                listeners.Get.forEach(ln => {
+                    if (ln.prop === '*' || ln.prop === key) val = ln.multi ? ln.fn('get', key, obj) : ln.fn(key, obj);
                 });
-                val = val != undef ? val : value;
-                if (isObj(val) && !val.isObservable) val = observable(val);
-                obj.emit('$uberset:' + key, val);
-                obj[key] = val;
-            },
-            enumerable: false,
-        });
-        Object.keys(obj).forEach(key => {
-          if(isObj(obj[key]) && !obj[key].isObservable) obj[key] = observable(obj[key]);
-        });
-        if (root.Proxy) return new Proxy(obj, {
+                return val != undef ? val : obj[key];
+            } else return obj[key];
+        }));
+        defineprop(obj, 'set', desc((key, value) => {
+            let val;
+            listeners.Set.forEach(ln => {
+                if (ln.prop === '*' || ln.prop === key) val = ln.multi ? ln.fn('set', key, value, obj, Object.hasOwnProperty(obj, key)) :
+                    ln.fn(key, value, obj, Object.hasOwnProperty(obj, key));
+            });
+            val = val != undef ? val : value;
+            if (isObj(val) && !val.isObservable) val = observable(val);
+            obj.emit('$uberset:' + key, val);
+            obj[key] = val;
+        }));
+
+        for (let key in obj)
+            if (isObj(obj[key]) && !obj[key].isObservable) obj[key] = observable(obj[key]);
+        if (typeof Proxy != "undefined") return new Proxy(obj, {
             get(target, key) {
                 if (key != 'get' && key != 'set') {
                     let val;
-                    target.listeners.Get.forEach(ln => {
+                    listeners.Get.forEach(ln => {
                         if (ln.prop === '*' || ln.prop === key) val = ln.multi ? ln.fn('get', key, target) : ln.fn(key, target);
                     });
-                    return val != undefined ? val : Reflect.get(target, key);
+                    return val != undef ? val : Reflect.get(target, key);
                 } else return Reflect.get(target, key);
             },
             set(target, key, value) {
                 let val, onetime = false;
-                target.listeners.Set.forEach(ln => {
+                listeners.Set.forEach(ln => {
                     if (ln.prop === '*' || ln.prop === key) {
                         if (onetime) {
                             value = val;
@@ -185,25 +183,24 @@
                             ln.fn(key, value, target, !Reflect.has(target, key));
                     }
                 });
-                val = val != undefined ? val : value;
+                val = val != undef ? val : value;
                 if (isObj(val) && !val.isObservable) val = observable(val);
                 target.emit('$uberset:' + key, val);
                 return Reflect.set(target, key, val);
             }
         });
-        else {
-            console.warn('This Browser does not support Proxy, observables need to use the .set and .get accessors to work');
-            return obj;
-        }
+
+        console.warn('This Browser does not support Proxy, observables need to use the .set and .get accessors to work');
+        return obj;
     }
 
     if (typeof exports !== 'undefined') {
-      module.exports = {
-        observable,
-        eventemitter,
-      }
+        module.exports = {
+            observable,
+            eventsys,
+        }
     } else {
         root.observable = observable;
-        root.eventemitter = eventemitter;
+        root.eventsys = eventsys;
     }
-})(this)
+})(this);

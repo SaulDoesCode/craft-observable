@@ -2,7 +2,7 @@ const test = require('ava');
 const {
     eventsys,
     observable
-} = require('./craft-observable-es5.js');
+} = require('./craft-observable.js');
 
 test('eventsys', t => {
     t.plan(1);
