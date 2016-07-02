@@ -16,72 +16,57 @@
         if (!obj) obj = {};
         let listeners = new Set,
             stop = false;
-
-        function on(type, func) {
-            if (!isFunc(func)) throw new TypeError('.on() needs a function');
-            func.type = type;
-            listeners.add(func);
-            func.handle = {
-                on() {
-                    listeners.add(func);
-                    return func.handle;
-                },
-                once: () => once(type, func),
-                off() {
-                    off(func);
-                    return func.handle;
+        return Object.assign(obj, {
+            on(type, func) {
+                if (!isFunc(func)) throw new TypeError('.on() needs a function');
+                func.type = type;
+                listeners.add(func);
+                func.handle = {
+                    on() {
+                        listeners.add(func);
+                        return func.handle;
+                    },
+                    once: () => obj.once(type, func),
+                    off() {
+                        obj.off(func);
+                        return func.handle;
+                    }
+                };
+                return func.handle;
+            },
+            once(type, func) {
+                obj.off(func);
+                function funcwrapper() {
+                    func.apply(obj, arguments);
+                    obj.off(funcwrapper);
                 }
-            };
-            return func.handle;
-        }
-
-        function once(type, func) {
-            off(func);
-
-            function funcwrapper() {
-                func.apply(obj, arguments);
-                off(funcwrapper);
+                return obj.on(type, funcwrapper);
+            },
+            off(func) {
+                if (listeners.has(func)) listeners.delete(func);
+            },
+            emit(type) {
+                if (!stop && listeners.size > 0) {
+                    let args = [].slice.call(arguments, 1),
+                        ctx = this;
+                    listeners.forEach(ln => {
+                        if (ln.type == type && !stop) ln.apply(ctx, args);
+                    });
+                }
+            },
+            stopall(state) {
+                stop = isBool(state) ? state : true;
+            },
+            defineHandle(name, type) {
+                if (!type) type = name;
+                obj[name] = (fn, useOnce) => obj[useOnce ? 'once' : 'on'](type, fn);
             }
-            return on(type, funcwrapper);
-        }
-
-        function off(func) {
-            if (listeners.has(func)) listeners.delete(func);
-        }
-
-        function emit(type) {
-            if (!stop && listeners.size > 0) {
-                let args = [].slice.call(arguments, 1),
-                    ctx = this;
-                listeners.forEach(ln => {
-                    if (ln.type == type && !stop) ln.apply(ctx, args);
-                });
-            }
-        }
-
-        function stopall(state) {
-            stop = isBool(state) ? state : true;
-        }
-
-        function defineHandle(name, type) {
-            if (!type) type = name;
-            this[name] = (fn, useOnce) => (useOnce == true ? once : on)(type, fn);
-        }
-
-        obj.on = on;
-        obj.once = once;
-        obj.off = on;
-        obj.emit = emit;
-        obj.defineHandle = defineHandle;
-        obj.stopall = stopall;
-
-        return obj;
+        });
     }
 
     function observable(obj) {
         if (!obj) obj = {};
         obj = eventsys(obj);
-
         let listeners = {
             Get: new Set,
             Set: new Set,
@@ -94,7 +79,7 @@
                     func = prop;
                     prop = '*';
                 }
-                if (!isFunc(func)) throw new Error('.'+prop+' no function');
+                if (!isFunc(func)) throw new Error('.' + prop + ' no function');
                 let listener = {
                     prop: isString(prop) ? prop : '*',
                     fn: func,

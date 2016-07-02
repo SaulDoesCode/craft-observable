@@ -5,15 +5,27 @@ const {
 } = require('./craft-observable-es5.js');
 
 test('eventsys', t => {
-    t.plan(1);
+    t.plan(4);
     let notifier = eventsys();
 
+    let i = 0, x = 0;
     notifier.on('test', n => {
-        t.is(n, 'it works!');
+        if(!i) t.is(n, 'it works!');
+        i += 1;
+    });
+
+    notifier.once('test', n => {
+        if(!x) t.is(n, 'it works!');
+        x += 1;
     });
 
     notifier.emit('test', 'it works!');
+    notifier.emit('test', 'it works!');
+    notifier.emit('test', 'it works!');
+    notifier.emit('test', 'it works!');
 
+    t.is(i,4);
+    t.is(x,1);
 });
 
 test('observable:isObservable', t => {
@@ -74,5 +86,15 @@ test('observable:nested', t => {
     base.nest1.nest2.nest3 = {};
 
     t.true(base.nest1.nest2.nest3.isObservable)
+
+});
+
+test('observable:on-off-once', t => {
+    //t.plan(3);
+
+    t.pass();
+    let base = observable();
+
+
 
 });
