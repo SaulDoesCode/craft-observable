@@ -2,6 +2,7 @@
 "use strict";
     let isFunc = o => typeof o === 'function',
         isString = o => typeof o === 'string',
+        isBool = o => typeof o === 'boolean',
         isObj = o => toString.call(o) === '[object Object]',
         defineprop = Object.defineProperty;
 
@@ -10,32 +11,39 @@
             evtlisteners: new Set,
             stop: false,
             on(type, func) {
-                if (!isFunc(func)) throw new TypeError(`.on(${type},func) : func is not a function`);
+                if (!isFunc(func)) throw new TypeError('.on() needs a function');
                 func.etype = type;
                 options.evtlisteners.add(func);
-                return {
+                func.ehandle = {
                     on() {
                         func.etype = type;
                         options.evtlisteners.add(func);
-                        return options;
+                        return func.ehandle;
                     },
-                    off: () => options.off(func),
-                }
+                    once() {
+                      return options.off(func).once(type,func);
+                    },
+                    off() {
+                      options.off(func);
+                      return func.ehandle;
+                    }
+                };
+                return func.ehandle
             },
             once(type, func) {
                 function funcwrapper() {
                     func.apply(obj, arguments);
                     options.off(funcwrapper);
                 }
-                options.on(type, funcwrapper);
+                return options.on(type, funcwrapper);
             },
             off(func) {
                 if (options.evtlisteners.has(func)) options.evtlisteners.delete(func);
                 return options;
             },
             emit(type) {
-                if (!options.stop) {
-                    let args = Array.from(arguments).slice(1);
+                if (!options.stop && options.evtlisteners.size > 0) {
+                    let args = [].slice.call(arguments,1);
                     options.evtlisteners.forEach(ln => {
                         if (ln.etype == type && !options.stop) ln.apply(obj, args);
                     });
@@ -43,7 +51,7 @@
                 return options;
             },
             stopall(stop) {
-                options.stop = stop === true || stop === false ? stop : true;
+                options.stop = isBool(bool) ? stop : true;
             },
             defineHandle(name, type) {
                 if (!type) type = name;
@@ -51,14 +59,7 @@
                 return options;
             },
         };
-        Object.keys(options).forEach(key => {
-            defineprop(obj, key, {
-                value: options[key],
-                enumerable: false,
-                writable: false,
-            })
-        });
-        return obj;
+        return Object.assign(obj,options);
     }
 
     function observable(obj) {
