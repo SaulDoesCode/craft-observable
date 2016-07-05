@@ -191,7 +191,7 @@
         return Reflect.set(target, key, val);
       }
     });
-    console.warn('This Browser does not support Proxy, observables need to use the .set and .get accessors to work');
+    console.warn('This JavaScript Environment does not support Proxy, observables need to use the .set and .get accessors to work');
     return obj;
   }
   if (typeof exports !== 'undefined') {
