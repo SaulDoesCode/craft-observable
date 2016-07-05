@@ -1,19 +1,30 @@
-## craft-observable
+# craft-observable
+
 small proxy driven observable objects to fit any framework or library
 
-#### craft-observable uses
-* Proxy (optional)
-* ES6 syntax (optional)
-* Set
-* Array.from
-* Object.assign
+## craft-observable uses
 
-#### observables code demo
-basic instanciator ``observable(=[obj|function])``
+- Proxy (optional)
+- ES6 syntax (optional)
+- Set
+- Array.from
+- Object.assign
+
+## observables have the following properties
+
+- .isObservable - true if it is an observable
+- .set, .get - old school non proxy accessors
+- .$set, .$get, .$change - listeners for access events
+- .on , .once , .off , .emit, .stopall - event system
+- .defineHandle - define event methods instead of using .on('xyz',function) all the time
+
+### observables code demo
+
+basic instanciator `observable(=[obj|function])`
 
 ```javascript
   // node.js style requiring works but will be global if not available
-  const { observable, eventemitter } = require('craft-observable');
+  const { observable, eventsys } = require('craft-observable');
 
   let farm = observable();
 
@@ -42,13 +53,16 @@ basic instanciator ``observable(=[obj|function])``
   });
 
   console.log(farm.animals.sheep); // -> the farm has no sheep
-  // if proxy is not available in your browser use the traditional get and set accessor methods
+  // if proxy is not available in your browser || javascript environment use the traditional get and set accessor methods
   console.log(farm.animals.get('sheep')); // -> the farm has no sheep
 
   console.log(farm.animals.cows); // -> the farm has 2 cows
 ```
-#### event system
+
+### event system
+
 the observables also include a build in event system to help make them as useful as possible
+
 ```javascript
   let notifier = observable();
 
@@ -79,10 +93,11 @@ the observables also include a build in event system to help make them as useful
   // or
   uiChange.once();
 ```
-#### separate use of event system
+
+### separate use of event system
 
 ```javascript
-  let messager = eventemitter({});
+  let messager = eventsys({});
 
   // .on, .once listeners have same interface
   messager.on('msg', event => {
@@ -105,18 +120,50 @@ the observables also include a build in event system to help make them as useful
   messager.stopall(false); // working again
 ```
 
-### observables have the following properties
-* .isObservable - true if it is an observable
-* .set, .get - old school non proxy accessors
-* .$set, .$get, .$change - listeners for access events
-* .on , .once , .off , .emit, .stopall - event system
-* .listeners - all the accessor listeners
-* .evtlisteners - event listeners
-* .defineHandle - define event methods instead of using .on('xyz',function) all the time
+## crazy meta objects
 
-### Notes
-This little doodle is subject to change but we'll try and keep it working as much as posible
-with no breaking changes. if you are experiencing issues or want to improve a feature do fork,
-raise issues tell us about bugs and so forth.
+implement cool features by chaging the behavior of objects
+here is an example of what is possible, note this is probably a bad example
+but still it demonstrates the potential of observables to create new behaviour in objects
+```javascript
+  const fs = require('fs');
+  const {observable} = require('craft-observable');
+  const metaobject = observable({
+    logloc : './log.txt'
+  });
+
+
+  metaobject.$set('log',(key,val,obj) => {
+    fs.appendFile(obj.logloc, val, err => {
+        if (err) throw err;
+        console.log(val);
+    });
+  });
+
+  metaobject.$get('log',(key,obj) => fs.readFileSync(obj.logloc,'utf8'));
+
+  const getfile = observable();
+
+  getfile.$get((key,obj) => {
+    const path = __dirname+'/'+key;
+    const stats = fs.statSync(path);
+    if(stats.isFile()) return fs.readFileSync(path,'utf8');
+  });
+
+  const server = require('http').createServer((req, res) => {
+    res.statusCode = 200;
+    res.setHeader('Content-Type', 'text/html');
+    res.end(getfile['index.html']);
+    metaobject.log = `${Date.now()} : request made \n`;
+  });
+
+  server.listen(3000, '127.0.0.1', () => {
+    console.log(`Server running at http://127.0.0.1:3000/`);
+  });
+```
+
+## Notes
+
+This little doodle is subject to change but we'll try and keep it working as much as posible with no breaking changes. if you are experiencing issues or want to improve a feature do fork, raise issues tell us about bugs and so forth.
 
 Thank you very much enjoy the observables

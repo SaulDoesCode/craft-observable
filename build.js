@@ -4,6 +4,8 @@ const fs = require('fs'),
     ClosureCompiler = require('google-closure-compiler').compiler,
     babel = require("babel-core");
 
+const LIBNAME = 'craft-observable';
+
 let BabelOptions = {
         plugins: [
             "transform-es2015-template-literals",
@@ -30,12 +32,12 @@ let BabelOptions = {
     };
 
 function gendocs() {
-    docs(['./craft-observable.js'], {
+    docs([`./${LIBNAME}.js`], {
         github: true
     }, (err, result) => {
         if (err) throw err;
         docs.formats['md'](result, {}, (error, output) => {
-            fs.writeFile('./docs/craft-observable.md', output, 'utf8', err => {
+            fs.writeFile(`./docs/${LIBNAME}.md`, output, 'utf8', err => {
                 if (err) throw err;
                 console.log('docs gen success!');
             });
@@ -86,12 +88,12 @@ function BabelizeBeautifyMinify(inloc, outloc) {
         });
         fs.writeFile(outloc, beautifiedCode, 'utf8', err => {
             if (err) throw err;
-            console.log('Success -> craft-observable.js Babelized!\n');
+            console.log(`Success -> ${LIBNAME}.js Babelized!\n`);
 
             minjs(outloc).then(out => {
                 fs.writeFile(outloc.replace('.js', '.min.js'), out, 'utf8', err => {
                     if (err) throw err;
-                    console.log('Success -> craft-observable.js Babelized and Minified!\n')
+                    console.log(`Success -> ${LIBNAME}.js Babelized and Minified!\n`)
                 })
             });
 
@@ -103,5 +105,5 @@ function BabelizeBeautifyMinify(inloc, outloc) {
 process.argv.forEach((val, index, array) => {
     if (val == 'docs') gendocs();
     else if (val == 'polyfills') BundlePolyfills();
-    else if (val == 'co') BabelizeBeautifyMinify("./craft-observable.js", "./craft-observable-es5.js");
+    else if (val == 'co') BabelizeBeautifyMinify(`./${LIBNAME}.js`, `./${LIBNAME}-es5.js`);
 });
