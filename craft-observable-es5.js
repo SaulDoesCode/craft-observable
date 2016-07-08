@@ -13,6 +13,7 @@
       return toString.call(o) === '[object Object]';
     },
     undef = undefined,
+    concatObjects = Object.assign,
     defineprop = Object.defineProperty,
     desc = function(value, write, enumerable) {
       return {
@@ -22,57 +23,98 @@
       };
     };
 
+  function listener() {
+    var container = new Map(),
+      actions = {
+        delete: function(type, func) {
+          if (actions.has(type, func)) {
+            var handlers = container.get(type);
+            if (!handlers.size) container.delete(type);
+            if (handlers.has(func)) handlers.delete(func);
+          }
+        },
+        set: function(type, func, once) {
+          if (isFunc(func)) {
+            if (!container.has(type)) container.set(type, new Set());
+            if (once === true) func.__isOnce = true;
+            container.get(type).add(func);
+          }
+        },
+        get: function(type) {
+          return container.get(type);
+        },
+        has: function(type, func) {
+          return container.size > 0 && container.has(type) && container.get(type).has(func);
+        },
+        loop: function(type, fn) {
+          if (container.size > 0 && container.has(type)) {
+            (function() {
+              var handlers = container.get(type);
+              handlers.forEach(function(handler) {
+                fn(handler);
+                if (handler.__isOnce === true) handlers.delete(handler);
+              });
+            })();
+          }
+        },
+        makeHandle: function(type, func) {
+          if (!isFunc(func)) throw new TypeError('eventsys : listener needs a function');
+          return {
+            on: function() {
+              Array.isArray(type) ? type.map(function(t) {
+                actions.set(t, func);
+              }) : actions.set(type, func);
+              return this;
+            },
+            once: function() {
+              Array.isArray(type) ? type.map(function(t) {
+                actions.set(t, func, true);
+              }) : actions.set(type, func, true);
+              return this;
+            },
+            off: function() {
+              Array.isArray(type) ? type.map(function(t) {
+                actions.delete(t, func);
+              }) : actions.delete(type, func);
+              return this;
+            }
+          };
+        }
+      };
+    return actions;
+  }
+  /**
+   * Adds an Event System to Arbitrary Objects and Classes.
+   * @method eventsys
+   * @param {Object|Function|Class} obj - object to convert
+   */
   function eventsys(obj) {
     if (!obj) obj = {};
-    var listeners = new Set(),
+    var listeners = listener(),
       stop = false;
-    return Object.assign(obj, {
+    return concatObjects(obj, {
       on: function(type, func) {
-        if (!isFunc(func)) throw new TypeError('.on() needs a function');
-        func.type = type;
-        listeners.add(func);
-        func.handle = {
-          on: function() {
-            listeners.add(func);
-            return func.handle;
-          },
-          once: function() {
-            return obj.once(type, func);
-          },
-          off: function() {
-            obj.off(func);
-            return func.handle;
-          }
-        };
-        return func.handle;
+        return listeners.makeHandle(type, func).on();
       },
       once: function(type, func) {
-        obj.off(func);
-
-        function funcwrapper() {
-          func.apply(obj, arguments);
-          obj.off(funcwrapper);
-        }
-        return obj.on(type, funcwrapper);
+        return listeners.makeHandle(type, func).once();
       },
-      off: function(func) {
-        if (listeners.has(func)) listeners.delete(func);
+      off: function(type, func) {
+        return listeners.makeHandle(type, func).off();
       },
       emit: function(type) {
-        var _arguments = arguments,
-          _this = this;
-        if (!stop && listeners.size > 0) {
+        var _arguments = arguments;
+        if (!stop && isString(type)) {
           (function() {
-            var args = [].slice.call(_arguments, 1),
-              ctx = _this;
-            listeners.forEach(function(ln) {
-              if (ln.type == type && !stop) ln.apply(ctx, args);
+            var args = [].slice.call(_arguments, 1);
+            listeners.loop(type, function(handle) {
+              handle.apply(obj, args);
             });
           })();
-        }
+        } else throw new TypeError('eventsys : you cannot emit that! ' + type);
       },
       stopall: function(state) {
-        stop = isBool(state) ? state : true;
+        return stop = isBool(state) ? state : true;
       },
       defineHandle: function(name, type) {
         if (!type) type = name;
@@ -82,16 +124,17 @@
       }
     });
   }
-
-  function observable(obj) {
+  /**
+   * Creates observables.
+   * @method observable
+   * @param {Object|Function|Class} obj - object to convert
+   */
+  function observable(obj, noEventSys) {
     if (!obj) obj = {};
-    obj = eventsys(obj);
-    var listeners = {
-      Get: new Set(),
-      Set: new Set()
-    };
+    if (!noEventSys) obj = eventsys(obj);
+    var listeners = listener();
     defineprop(obj, 'isObservable', desc(true));
-    ['$get', '$set'].forEach(function(prop) {
+    ['$get', '$set'].map(function(prop) {
       var accessor = prop == '$get' ? 'Get' : 'Set';
       defineprop(obj, prop, desc(function(prop, func) {
         if (isFunc(prop)) {
@@ -99,61 +142,23 @@
           prop = '*';
         }
         if (!isFunc(func)) throw new Error('.' + prop + ' no function');
-        var listener = {
-            prop: isString(prop) ? prop : '*',
-            fn: func
-          },
-          options = {
-            on: function() {
-              listeners[accessor].add(listener);
-              return options;
-            },
-            off: function() {
-              listeners[accessor].delete(listener);
-              return options;
-            }
-          };
-        return options.on();
+        func.prop = isString(prop) ? prop : '*';
+        return listeners.makeHandle(accessor, func).on();
       }));
     });
-    defineprop(obj, '$change', desc(function(prop, func) {
-      if (isFunc(prop)) {
-        func = prop;
-        prop = '*';
-      }
-      if (!isFunc(func)) throw new Error('.$change : no function');
-      var listener = {
-          prop: isString(prop) ? prop : '*',
-          fn: func,
-          multi: true
-        },
-        options = {
-          on: function() {
-            listeners.Get.add(listener);
-            listeners.Set.add(listener);
-            return options;
-          },
-          off: function() {
-            listeners.Get.delete(listener);
-            listeners.Set.delete(listener);
-            return options;
-          }
-        };
-      return options.on;
-    }));
     defineprop(obj, 'get', desc(function(key) {
       if (key != 'get' && key != 'set') {
         var val = void 0;
-        listeners.Get.forEach(function(ln) {
-          if (ln.prop === '*' || ln.prop === key) val = ln.multi ? ln.fn('get', key, obj) : ln.fn(key, obj);
+        listeners.loop('Get', function(ln) {
+          if (ln.prop === '*' || ln.prop === key) val = ln(key, obj);
         });
         return val != undef ? val : obj[key];
       } else return obj[key];
     }));
     defineprop(obj, 'set', desc(function(key, value) {
       var val = void 0;
-      listeners.Set.forEach(function(ln) {
-        if (ln.prop === '*' || ln.prop === key) val = ln.multi ? ln.fn('set', key, value, obj, Object.hasOwnProperty(obj, key)) : ln.fn(key, value, obj, Object.hasOwnProperty(obj, key));
+      listeners.loop('Set', function(ln) {
+        if (ln.prop === '*' || ln.prop === key) val = ln(key, value, obj, Object.hasOwnProperty(obj, key));
       });
       val = val != undef ? val : value;
       if (isObj(val) && !val.isObservable) val = observable(val);
@@ -163,12 +168,12 @@
     for (var key in obj) {
       if (isObj(obj[key]) && !obj[key].isObservable) obj[key] = observable(obj[key]);
     }
-    if (typeof Proxy != "undefined") return new Proxy(obj, {
+    if (typeof Proxy != 'undefined') return new Proxy(obj, {
       get: function(target, key) {
         if (key != 'get' && key != 'set') {
           var val = void 0;
-          listeners.Get.forEach(function(ln) {
-            if (ln.prop === '*' || ln.prop === key) val = ln.multi ? ln.fn('get', key, target) : ln.fn(key, target);
+          listeners.loop('Get', function(ln) {
+            if (ln.prop === '*' || ln.prop === key) val = ln(key, target);
           });
           return val != undef ? val : Reflect.get(target, key);
         } else return Reflect.get(target, key);
@@ -176,13 +181,13 @@
       set: function(target, key, value) {
         var val = void 0,
           onetime = false;
-        listeners.Set.forEach(function(ln) {
+        listeners.loop('Set', function(ln) {
           if (ln.prop === '*' || ln.prop === key) {
             if (onetime) {
               value = val;
               onetime = false;
             } else onetime = true;
-            val = ln.multi ? ln.fn('set', key, value, target, !Reflect.has(target, key)) : ln.fn(key, value, target, !Reflect.has(target, key));
+            val = ln(key, value, target, !Reflect.has(target, key));
           }
         });
         val = val != undef ? val : value;
@@ -197,10 +202,12 @@
   if (typeof exports !== 'undefined') {
     module.exports = {
       observable: observable,
-      eventsys: eventsys
+      eventsys: eventsys,
+      listener: listener
     };
   } else {
     root.observable = observable;
     root.eventsys = eventsys;
+    root.listener = listener;
   }
 })(this);
