@@ -5,6 +5,7 @@
         isBool = o => typeof o === 'boolean',
         isObj = o => toString.call(o) === '[object Object]',
         undef = undefined,
+        concatObjects = Object.assign,
         defineprop = Object.defineProperty,
         desc = (value, write, enumerable) => ({
             value,
@@ -12,160 +13,156 @@
             enumerable: isBool(enumerable) ? enumerable : false,
         })
 
+    function listener() {
+        const container = new Map,
+            actions = {
+                delete(type, func) {
+                    if (actions.has(type, func)) {
+                        const handlers = container.get(type);
+                        if (!handlers.size) container.delete(type);
+                        if (handlers.has(func)) handlers.delete(func);
+                    }
+                },
+                set(type, func, once) {
+                    if (isFunc(func)) {
+                        if (!container.has(type)) container.set(type, new Set);
+                        if (once === true) func.__isOnce = true;
+                        container.get(type).add(func);
+                    }
+                },
+                get(type) {
+                    return container.get(type);
+                },
+                has(type, func) {
+                    return container.size > 0 && container.has(type) && container.get(type).has(func);
+                },
+                loop(type, fn) {
+                    if (container.size > 0 && container.has(type)) {
+                        const handlers = container.get(type);
+                        handlers.forEach(handler => {
+                            fn(handler);
+                            if (handler.__isOnce === true) handlers.delete(handler);
+                        });
+                    }
+
+                },
+                makeHandle(type, func) {
+                    if (!isFunc(func)) throw new TypeError('eventsys : listener needs a function');
+                    return {
+                        on() {
+                            Array.isArray(type) ? type.map(t => {
+                                actions.set(t, func);
+                            }) : actions.set(type, func);
+                            return this;
+                        },
+                        once() {
+                            Array.isArray(type) ? type.map(t => {
+                                actions.set(t, func, true);
+                            }) : actions.set(type, func, true);
+                            return this;
+                        },
+                        off() {
+                            Array.isArray(type) ? type.map(t => {
+                                actions.delete(t, func);
+                            }) : actions.delete(type, func);
+                            return this;
+                        }
+                    };
+                }
+            };
+        return actions;
+    }
+
+    /**
+     * Adds an Event System to Arbitrary Objects and Classes.
+     * @method eventsys
+     * @param {Object|Function|Class} obj - object to convert
+     */
     function eventsys(obj) {
         if (!obj) obj = {};
-        let listeners = new Set,
-            stop = false;
-        return Object.assign(obj, {
-            on(type, func) {
-                if (!isFunc(func)) throw new TypeError('.on() needs a function');
-                func.type = type;
-                listeners.add(func);
-                func.handle = {
-                    on() {
-                        listeners.add(func);
-                        return func.handle;
-                    },
-                    once: () => obj.once(type, func),
-                    off() {
-                        obj.off(func);
-                        return func.handle;
-                    }
-                };
-                return func.handle;
-            },
-            once(type, func) {
-                obj.off(func);
-                function funcwrapper() {
-                    func.apply(obj, arguments);
-                    obj.off(funcwrapper);
-                }
-                return obj.on(type, funcwrapper);
-            },
-            off(func) {
-                if (listeners.has(func)) listeners.delete(func);
-            },
+        const listeners = listener();
+        let stop = false;
+        return concatObjects(obj, {
+            on: (type, func) => listeners.makeHandle(type, func).on(),
+            once: (type, func) => listeners.makeHandle(type, func).once(),
+            off: (type, func) => listeners.makeHandle(type, func).off(),
             emit(type) {
-                if (!stop && listeners.size > 0) {
-                    let args = [].slice.call(arguments, 1),
-                        ctx = this;
-                    listeners.forEach(ln => {
-                        if (ln.type == type && !stop) ln.apply(ctx, args);
+                if (!stop && isString(type)) {
+                    const args = [].slice.call(arguments, 1);
+                    listeners.loop(type, handle => {
+                        handle.apply(obj, args);
                     });
-                }
+                } else throw new TypeError('eventsys : you cannot emit that! ' + type);
             },
-            stopall(state) {
-                stop = isBool(state) ? state : true;
-            },
+            stopall: state => stop = isBool(state) ? state : true,
             defineHandle(name, type) {
                 if (!type) type = name;
                 obj[name] = (fn, useOnce) => obj[useOnce ? 'once' : 'on'](type, fn);
             }
         });
     }
-
-    function observable(obj) {
+    /**
+     * Creates observables.
+     * @method observable
+     * @param {Object|Function|Class} obj - object to convert
+     */
+    function observable(obj, noEventSys) {
         if (!obj) obj = {};
-        obj = eventsys(obj);
-        let listeners = {
-            Get: new Set,
-            Set: new Set,
-        };
+        if (!noEventSys) obj = eventsys(obj);
+        const listeners = listener();
         defineprop(obj, 'isObservable', desc(true));
-        ['$get', '$set'].forEach(prop => {
-            let accessor = prop == '$get' ? 'Get' : 'Set';
+        ['$get', '$set'].map(prop => {
+            const accessor = prop == '$get' ? 'Get' : 'Set';
             defineprop(obj, prop, desc((prop, func) => {
                 if (isFunc(prop)) {
                     func = prop;
                     prop = '*';
                 }
                 if (!isFunc(func)) throw new Error('.' + prop + ' no function');
-                let listener = {
-                    prop: isString(prop) ? prop : '*',
-                    fn: func,
-                }
-                let options = {
-                    on() {
-                        listeners[accessor].add(listener);
-                        return options
-                    },
-                    off() {
-                        listeners[accessor].delete(listener);
-                        return options
-                    },
-                };
-                return options.on();
+                func.prop = isString(prop) ? prop : '*';
+                return listeners.makeHandle(accessor, func).on();
             }));
         });
-
-        defineprop(obj, '$change', desc((prop, func) => {
-            if (isFunc(prop)) {
-                func = prop;
-                prop = '*';
-            }
-            if (!isFunc(func)) throw new Error('.$change : no function');
-            let listener = {
-                prop: isString(prop) ? prop : '*',
-                fn: func,
-                multi: true,
-            }
-            let options = {
-                on() {
-                    listeners.Get.add(listener);
-                    listeners.Set.add(listener);
-                    return options
-                },
-                off() {
-                    listeners.Get.delete(listener);
-                    listeners.Set.delete(listener);
-                    return options
-                },
-            };
-            return options.on;
-        }));
         defineprop(obj, 'get', desc(key => {
             if (key != 'get' && key != 'set') {
                 let val;
-                listeners.Get.forEach(ln => {
-                    if (ln.prop === '*' || ln.prop === key) val = ln.multi ? ln.fn('get', key, obj) : ln.fn(key, obj);
+                listeners.loop('Get', ln => {
+                    if (ln.prop === '*' || ln.prop === key) val = ln(key, obj);
                 });
                 return val != undef ? val : obj[key];
             } else return obj[key];
         }));
         defineprop(obj, 'set', desc((key, value) => {
             let val;
-            listeners.Set.forEach(ln => {
-                if (ln.prop === '*' || ln.prop === key) val = ln.multi ? ln.fn('set', key, value, obj, Object.hasOwnProperty(obj, key)) :
-                    ln.fn(key, value, obj, Object.hasOwnProperty(obj, key));
+            listeners.loop('Set', ln => {
+                if (ln.prop === '*' || ln.prop === key) val = ln(key, value, obj, Object.hasOwnProperty(obj, key));
             });
             val = val != undef ? val : value;
             if (isObj(val) && !val.isObservable) val = observable(val);
             obj.emit('$uberset:' + key, val);
             obj[key] = val;
         }));
-
         for (let key in obj)
             if (isObj(obj[key]) && !obj[key].isObservable) obj[key] = observable(obj[key]);
-        if (typeof Proxy != "undefined") return new Proxy(obj, {
+        if (typeof Proxy != 'undefined') return new Proxy(obj, {
             get(target, key) {
                 if (key != 'get' && key != 'set') {
                     let val;
-                    listeners.Get.forEach(ln => {
-                        if (ln.prop === '*' || ln.prop === key) val = ln.multi ? ln.fn('get', key, target) : ln.fn(key, target);
+                    listeners.loop('Get', ln => {
+                        if (ln.prop === '*' || ln.prop === key) val = ln(key, target);
                     });
                     return val != undef ? val : Reflect.get(target, key);
                 } else return Reflect.get(target, key);
             },
             set(target, key, value) {
                 let val, onetime = false;
-                listeners.Set.forEach(ln => {
+                listeners.loop('Set', ln => {
                     if (ln.prop === '*' || ln.prop === key) {
                         if (onetime) {
                             value = val;
                             onetime = false;
                         } else onetime = true;
-                        val = ln.multi ? ln.fn('set', key, value, target, !Reflect.has(target, key)) :
-                            ln.fn(key, value, target, !Reflect.has(target, key));
+                        val = ln(key, value, target, !Reflect.has(target, key));
                     }
                 });
                 val = val != undef ? val : value;
@@ -183,9 +180,11 @@
         module.exports = {
             observable,
             eventsys,
+            listener,
         }
     } else {
         root.observable = observable;
         root.eventsys = eventsys;
+        root.listener = listener;
     }
 })(this);

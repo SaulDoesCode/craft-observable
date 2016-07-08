@@ -14,7 +14,7 @@ small proxy driven observable objects to fit any framework or library
 
 - .isObservable - true if it is an observable
 - .set, .get - old school non proxy accessors
-- .$set, .$get, .$change - listeners for access events
+- .$set, .$get - listeners for access events
 - .on , .once , .off , .emit, .stopall - event system
 - .defineHandle - define event methods instead of using .on('xyz',function) all the time
 
