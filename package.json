@@ -1,6 +1,6 @@
 {
   "name": "craft-observable",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "small proxy driven observable objects to fit any framework or library",
   "main": "craft-observable-es5.js",
   "scripts": {
