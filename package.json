@@ -2,9 +2,10 @@
   "name": "craft-observable",
   "version": "3.0.0",
   "description": "small proxy driven observable objects to fit any framework or library",
-  "main": "craft-observable-es5.js",
+  "main": "craft-observable-es5.min.js",
   "scripts": {
-    "test": "./node_modules/.bin/ava test-2.js"
+    "build": "./node_modules/.bin/minify craft-observable.js --outFile ./craft-observable.min.js && ./node_modules/.bin/babel ./craft-observable.min.js -o ./craft-observable-es5.js && ./node_modules/.bin/minify ./craft-observable-es5.js --outFile ./craft-observable-es5.min.js && rm ./craft-observable-es5.js",
+    "test": "yarn build && ./node_modules/.bin/ava test.js"
   },
   "repository": {
     "type": "git",
@@ -23,12 +24,7 @@
   },
   "homepage": "https://github.com/SaulDoesCode/craft-observable#readme",
   "devDependencies": {
-    "ava": "^0.15.2",
-    "babel-core": "^6.9.0",
-    "babel-plugin-transform-merge-sibling-variables": "^6.8.0",
-    "babel-preset-es2015": "^6.1.2",
-    "documentation": "^4.0.0-beta2",
-    "google-closure-compiler": "^20160517.1.0",
-    "js-beautify": "^1.6.2"
+    "@babel/cli": "^7.0.0-beta.51",
+    "babel-minify": "^0.4.3"
   }
 }
