@@ -4,7 +4,7 @@
   "description": "small proxy driven observable objects to fit any framework or library",
   "main": "craft-observable-es5.js",
   "scripts": {
-    "test": "ava"
+    "test": "./node_modules/.bin/ava test-2.js"
   },
   "repository": {
     "type": "git",
