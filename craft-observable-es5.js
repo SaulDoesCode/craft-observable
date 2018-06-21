@@ -1,7 +1,8 @@
+;
 (function(root) {
-  "use strict";
+  'use strict';
   var isFunc = function(o) {
-      return typeof o === 'function';
+      return o instanceof Function;
     },
     isString = function(o) {
       return typeof o === 'string';
@@ -13,7 +14,7 @@
       return toString.call(o) === '[object Object]';
     },
     undef = undefined,
-    concatObjects = Object.assign,
+    assign = Object.assign,
     defineprop = Object.defineProperty,
     desc = function(value, write, enumerable) {
       return {
@@ -29,8 +30,8 @@
         delete: function(type, func) {
           if (actions.has(type, func)) {
             var handlers = container.get(type);
-            if (!handlers.size) container.delete(type);
             if (handlers.has(func)) handlers.delete(func);
+            if (!handlers.size) container.delete(type);
           }
         },
         set: function(type, func, once) {
@@ -47,38 +48,103 @@
           return container.size > 0 && container.has(type) && container.get(type).has(func);
         },
         loop: function(type, fn) {
-          if (container.size > 0 && container.has(type)) {
-            (function() {
-              var handlers = container.get(type);
-              handlers.forEach(function(handler) {
-                fn(handler);
-                if (handler.__isOnce === true) handlers.delete(handler);
-              });
-            })();
-          }
+          container.has(type) && container.get(type).forEach(function(handler, handlers) {
+            fn(handler);
+            if (handler.__isOnce === true) handlers.delete(handler);
+          });
         },
         makeHandle: function(type, func) {
           if (!isFunc(func)) throw new TypeError('eventsys : listener needs a function');
-          return {
+          var H = {
             on: function() {
-              Array.isArray(type) ? type.map(function(t) {
-                actions.set(t, func);
-              }) : actions.set(type, func);
-              return this;
+              if (Array.isArray(type)) {
+                var _iteratorNormalCompletion = true,
+                  _didIteratorError = false,
+                  _iteratorError = undefined;
+                try {
+                  for (var _iterator = type[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+                    var t = _step.value;
+                    actions.set(t, func);
+                  }
+                } catch (err) {
+                  _didIteratorError = true;
+                  _iteratorError = err;
+                } finally {
+                  try {
+                    if (!_iteratorNormalCompletion && _iterator.return) {
+                      _iterator.return();
+                    }
+                  } finally {
+                    if (_didIteratorError) {
+                      throw _iteratorError;
+                    }
+                  }
+                }
+              } else {
+                actions.set(type, func);
+              }
+              return H;
             },
             once: function() {
-              Array.isArray(type) ? type.map(function(t) {
-                actions.set(t, func, true);
-              }) : actions.set(type, func, true);
-              return this;
+              if (Array.isArray(type)) {
+                var _iteratorNormalCompletion2 = true,
+                  _didIteratorError2 = false,
+                  _iteratorError2 = undefined;
+                try {
+                  for (var _iterator2 = type[Symbol.iterator](), _step2; !(_iteratorNormalCompletion2 = (_step2 = _iterator2.next()).done); _iteratorNormalCompletion2 = true) {
+                    var t = _step2.value;
+                    actions.set(t, func, true);
+                  }
+                } catch (err) {
+                  _didIteratorError2 = true;
+                  _iteratorError2 = err;
+                } finally {
+                  try {
+                    if (!_iteratorNormalCompletion2 && _iterator2.return) {
+                      _iterator2.return();
+                    }
+                  } finally {
+                    if (_didIteratorError2) {
+                      throw _iteratorError2;
+                    }
+                  }
+                }
+              } else {
+                actions.set(type, func, true);
+              }
+              return H;
             },
             off: function() {
-              Array.isArray(type) ? type.map(function(t) {
-                actions.delete(t, func);
-              }) : actions.delete(type, func);
-              return this;
+              if (Array.isArray(type)) {
+                var _iteratorNormalCompletion3 = true,
+                  _didIteratorError3 = false,
+                  _iteratorError3 = undefined;
+                try {
+                  for (var _iterator3 = type[Symbol.iterator](), _step3; !(_iteratorNormalCompletion3 = (_step3 = _iterator3.next()).done); _iteratorNormalCompletion3 = true) {
+                    var t = _step3.value;
+                    actions.delete(t, func);
+                  }
+                } catch (err) {
+                  _didIteratorError3 = true;
+                  _iteratorError3 = err;
+                } finally {
+                  try {
+                    if (!_iteratorNormalCompletion3 && _iterator3.return) {
+                      _iterator3.return();
+                    }
+                  } finally {
+                    if (_didIteratorError3) {
+                      throw _iteratorError3;
+                    }
+                  }
+                }
+              } else {
+                actions.delete(type, func);
+              }
+              return H;
             }
           };
+          return H;
         }
       };
     return actions;
@@ -92,7 +158,7 @@
     if (!obj) obj = {};
     var listeners = listener(),
       stop = false;
-    return concatObjects(obj, {
+    return assign(obj, {
       on: function(type, func) {
         return listeners.makeHandle(type, func).on();
       },
@@ -103,14 +169,11 @@
         return listeners.makeHandle(type, func).off();
       },
       emit: function(type) {
-        var _arguments = arguments;
         if (!stop && isString(type)) {
-          (function() {
-            var args = [].slice.call(_arguments, 1);
-            listeners.loop(type, function(handle) {
-              handle.apply(obj, args);
-            });
-          })();
+          var args = [].slice.call(arguments, 1);
+          listeners.loop(type, function(handle) {
+            handle.apply(obj, args);
+          });
         } else throw new TypeError('eventsys : you cannot emit that! ' + type);
       },
       stopall: function(state) {
@@ -199,15 +262,10 @@
     console.warn('This JavaScript Environment does not support Proxy, observables need to use the .set and .get accessors to work');
     return obj;
   }
-  if (typeof exports !== 'undefined') {
-    module.exports = {
-      observable: observable,
-      eventsys: eventsys,
-      listener: listener
-    };
-  } else {
-    root.observable = observable;
-    root.eventsys = eventsys;
-    root.listener = listener;
-  }
-})(this);
+  observable.observable = observable;
+  observable.eventsys = eventsys;
+  observable.listener = listener;
+  typeof module !== 'undefined' ? module.exports = observable : root.define instanceof Function && root.define.amd ? root.define(['craft-observable'], function() {
+    return observable;
+  }) : root.observable = observable;
+})(typeof global !== 'undefined' ? global : window);
